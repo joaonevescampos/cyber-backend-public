@@ -60,7 +60,7 @@ class ProductRepositoryPrisma implements ProductRepository {
       },
     });
 
-    const result = brands.map((item) => ({
+    const result = brands.map((item : any) => ({
       brand: item.brand,
       total: item._count.brand,
     }));

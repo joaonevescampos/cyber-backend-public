@@ -51,7 +51,7 @@ class ReviewRepositoryPrisma implements ReviewRepository {
 
     async getReviewSummary(productId: number): Promise<ReviewSummary> {
 
-        const reviews = await prisma.review.findMany({
+        const reviews : {rating: number}[] = await prisma.review.findMany({
             where: {
                 id_product: productId
             },
