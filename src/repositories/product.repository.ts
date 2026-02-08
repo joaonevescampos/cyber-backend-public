@@ -14,8 +14,9 @@ type ProductOrderBy = {
 };
 
 class ProductRepositoryPrisma implements ProductRepository {
+
   async findAll(): Promise<ProductCard[]> {
-    const result = await prisma.product.findMany({
+    return prisma.product.findMany({
       select: {
         id: true,
         name: true,
@@ -25,15 +26,11 @@ class ProductRepositoryPrisma implements ProductRepository {
         tag: true,
       },
     });
-
-    return result;
   }
 
   async findByTag(tag: string): Promise<ProductCard[]> {
-    const result = await prisma.product.findMany({
-      where: {
-        tag: tag,
-      },
+    return prisma.product.findMany({
+      where: { tag },
       select: {
         id: true,
         name: true,
@@ -42,30 +39,22 @@ class ProductRepositoryPrisma implements ProductRepository {
         url_image: true,
         tag: true,
       },
-    });
-
-    return result as ProductCard[];
+    }) as Promise<ProductCard[]>;
   }
 
   async findBrandsWithTotal(): Promise<BrandTotal[]> {
     const brands = await prisma.product.groupBy({
       by: ["brand"],
-      _count: {
-        brand: true,
-      },
+      _count: { brand: true },
       orderBy: {
-        _count: {
-          brand: "desc",
-        },
+        _count: { brand: "desc" },
       },
     });
 
-    const result = brands.map((item : any) => ({
+    return brands.map(item => ({
       brand: item.brand,
       total: item._count.brand,
     }));
-
-    return result;
   }
 
   async findAllAndFilter(
@@ -74,70 +63,14 @@ class ProductRepositoryPrisma implements ProductRepository {
     order?: string,
     brands?: string[]
   ): Promise<{ products: ProductCard[]; totalItems: number }> {
+
     const productsPerPage = 9;
     const skip = (page - 1) * productsPerPage;
 
     const whereClause: any = {};
 
-    if (brands && brands.length > 0) {
-      whereClause.brand = {
-        in: brands,
-      };
-    }
-
-    const orderByClause: any[] = [];
-    if (sort === "price" && order) {
-      orderByClause.push({
-        price: order,
-      });
-      orderByClause.push({
-        discounted_price: order,
-      });
-    }
-
-    const [products, totalItems] = await prisma.$transaction([
-      prisma.product.findMany({
-        where: whereClause,
-        orderBy: orderByClause,
-        skip: skip,
-        take: productsPerPage,
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          discounted_price: true,
-          url_image: true,
-          tag: true,
-        },
-      }),
-      prisma.product.count({
-        where: whereClause,
-      }),
-    ]);
-
-    return { products: products as ProductCard[], totalItems };
-  }
-
-  async findFilteredProducts(
-    categoryName: string,
-    page: number,
-    sort?: string,
-    order?: string,
-    brands?: string[]
-  ): Promise<{ products: ProductCard[]; totalItems: number }> {
-    const productsPerPage = 9;
-    const skip = (page - 1) * productsPerPage;
-
-    const whereClause: any = {
-      category: {
-        name: categoryName,
-      },
-    };
-
-    if (brands && brands.length > 0) {
-      whereClause.brand = {
-        in: brands,
-      };
+    if (brands?.length) {
+      whereClause.brand = { in: brands };
     }
 
     const orderByClause: ProductOrderBy[] = [];
@@ -150,7 +83,7 @@ class ProductRepositoryPrisma implements ProductRepository {
       prisma.product.findMany({
         where: whereClause,
         orderBy: orderByClause,
-        skip: skip,
+        skip,
         take: productsPerPage,
         select: {
           id: true,
@@ -161,44 +94,75 @@ class ProductRepositoryPrisma implements ProductRepository {
           tag: true,
         },
       }),
-      prisma.product.count({
+      prisma.product.count({ where: whereClause }),
+    ]);
+
+    return { products: products as ProductCard[], totalItems };
+  }
+
+  async findFilteredProducts(
+    categoryName: string,
+    page: number,
+    sort?: string,
+    order?: string,
+    brands?: string[]
+  ): Promise<{ products: ProductCard[]; totalItems: number }> {
+
+    const productsPerPage = 9;
+    const skip = (page - 1) * productsPerPage;
+
+    const whereClause: any = {
+      category: { name: categoryName },
+    };
+
+    if (brands?.length) {
+      whereClause.brand = { in: brands };
+    }
+
+    const orderByClause: ProductOrderBy[] = [];
+    if (sort === "price" && order) {
+      orderByClause.push({ price: order as SortOrder });
+      orderByClause.push({ discounted_price: order as SortOrder });
+    }
+
+    const [products, totalItems] = await prisma.$transaction([
+      prisma.product.findMany({
         where: whereClause,
+        orderBy: orderByClause,
+        skip,
+        take: productsPerPage,
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          discounted_price: true,
+          url_image: true,
+          tag: true,
+        },
       }),
+      prisma.product.count({ where: whereClause }),
     ]);
 
     return { products: products as ProductCard[], totalItems };
   }
 
   async findById(id: number): Promise<ProductDetails | null> {
-    const product = await prisma.product.findUnique({
-      where: {
-        id: id,
-      },
+    return prisma.product.findUnique({
+      where: { id },
       include: {
         category: {
-          select: {
-            id: true,
-            name: true,
-          },
+          select: { id: true, name: true },
         },
         colors: true,
         storage_options: true,
         specs: true,
       },
-    });
-
-    if (!product) {
-      return null;
-    }
-
-    return product as ProductDetails;
+    }) as Promise<ProductDetails | null>;
   }
 
   async findByBrand(brand: string): Promise<ProductCard[]> {
-    const result = await prisma.product.findMany({
-      where: {
-        brand: brand,
-      },
+    return prisma.product.findMany({
+      where: { brand },
       select: {
         id: true,
         name: true,
@@ -208,17 +172,15 @@ class ProductRepositoryPrisma implements ProductRepository {
         tag: true,
       },
       take: 4,
-    });
-
-    return result as ProductCard[];
+    }) as Promise<ProductCard[]>;
   }
 
   async searchProducts(query: string): Promise<ProductCard[]> {
-    const result = await prisma.product.findMany({
+    return prisma.product.findMany({
       where: {
         name: {
           contains: query,
-          mode: 'insensitive',
+          mode: "insensitive",
         },
       },
       select: {
@@ -230,9 +192,7 @@ class ProductRepositoryPrisma implements ProductRepository {
         tag: true,
       },
       take: 10,
-    });
-
-    return result as ProductCard[];
+    }) as Promise<ProductCard[]>;
   }
 }
 
